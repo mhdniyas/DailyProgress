@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use Filament\Pages\Page;
 use App\Filament\Widgets\StockStatsWidget;
 use App\Filament\Widgets\StockComparisonWidget;
+use App\Filament\Widgets\StockComparisonTable;
 
 class StockDashboard extends Page
 {
@@ -16,7 +17,10 @@ class StockDashboard extends Page
     {
         return [
             StockStatsWidget::class,
+            StockComparisonTable::class,
             StockComparisonWidget::class,
         ];
     }
+
+
 }
