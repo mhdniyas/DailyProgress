@@ -56,13 +56,13 @@ class StockComparisonTable extends BaseWidget
                     $systemStock = StockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
-                    
+
                     $shopStock = ShopStockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
-                    
+
                     $difference = $systemStock - $shopStock;
-                    
+
                     return sprintf(
                         '%d (%s)',
                         abs($difference),
@@ -73,11 +73,11 @@ class StockComparisonTable extends BaseWidget
                     $systemStock = StockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
-                    
+
                     $shopStock = ShopStockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
-                    
+
                     return ($systemStock - $shopStock) >= 0 ? 'success' : 'danger';
                 }),
 
@@ -87,20 +87,20 @@ class StockComparisonTable extends BaseWidget
                     $systemRecord = StockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
-                    
+
                     $shopRecord = ShopStockRecord::where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
-                    
+
                     if (!$systemRecord && !$shopRecord) {
                         return 'Never';
                     }
-                    
+
                     $lastUpdate = collect([$systemRecord, $shopRecord])
                         ->filter()
                         ->sortByDesc('recorded_at')
                         ->first();
-                    
+
                     return $lastUpdate ? $lastUpdate->recorded_at->format('Y-m-d H:i:s') : 'Never';
                 })
                 ->sortable(),

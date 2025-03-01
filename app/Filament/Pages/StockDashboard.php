@@ -12,6 +12,7 @@ class StockDashboard extends Page
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
     protected static string $view = 'filament.pages.stock-dashboard';
     protected static ?string $title = 'Stock Dashboard';
+    protected static ?string $navigationGroup = 'Stock Management';
 
     protected function getHeaderWidgets(): array
     {
