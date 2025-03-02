@@ -18,10 +18,14 @@ class StockDashboard extends Page
     {
         return [
             StockStatsWidget::class,
-            StockComparisonTable::class,
-            StockComparisonWidget::class,
         ];
     }
 
-
+    protected function getFooterWidgets(): array
+    {
+        return [
+            StockComparisonWidget::class,
+            StockComparisonTable::class,
+        ];
+    }
 }

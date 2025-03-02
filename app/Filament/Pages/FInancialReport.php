@@ -291,21 +291,65 @@ class FinancialReport extends Page
             throw new Halt();
         }
     }
+    public function getTodayCredit()
+{
+    return Transaction::where('type', 'credit')
+        ->whereDate('date', Carbon::today())
+        ->sum('amount');
+}
+
+public function getTodayDebit()
+{
+    return Transaction::where('type', 'debit')
+        ->whereDate('date', Carbon::today())
+        ->sum('amount');
+}
+
+public function getTodayTotal()
+{
+    return $this->getTodayCredit() - $this->getTodayDebit();
+}
+
+public function getTodayTransactions()
+{
+    return [
+        'credit' => [
+            'amount' => $this->getTodayCredit(),
+            'color' => 'success',
+            'label' => "Today's Credit",
+            'description' => 'Total income today'
+        ],
+        'debit' => [
+            'amount' => $this->getTodayDebit(),
+            'color' => 'danger',
+            'label' => "Today's Debit",
+            'description' => 'Total expenses today'
+        ],
+        'total' => [
+            'amount' => $this->getTodayTotal(),
+            'color' => $this->getTodayTotal() >= 0 ? 'success' : 'danger',
+            'label' => "Today's Balance",
+            'description' => 'Net cashflow today'
+        ]
+    ];
+}
 
     protected function getViewData(): array
-    {
-        return [
-            'startDate' => $this->startDate,
-            'endDate' => $this->endDate,
-            'cashFlowData' => $this->getCashFlowData(),
-            'expenseByCategory' => $this->getExpenseByCategory(),
-            'expenseByType' => $this->getExpenseByType(),
-            'totalIncome' => $this->getTotalIncome(),
-            'totalExpenses' => $this->getTotalExpenses(),
-            'netCashFlow' => $this->getNetCashFlow(),
-            'monthlyComparison' => $this->getMonthlyComparison(),
-            'topExpenseCategories' => $this->getTopExpenseCategories(),
-            'lastThreeExpenses' => $this->getLastThreeExpenses(),
-        ];
-    }
+{
+    return [
+        'startDate' => $this->startDate,
+        'endDate' => $this->endDate,
+        'cashFlowData' => $this->getCashFlowData(),
+        'expenseByCategory' => $this->getExpenseByCategory(),
+        'expenseByType' => $this->getExpenseByType(),
+        'totalIncome' => $this->getTotalIncome(),
+        'totalExpenses' => $this->getTotalExpenses(),
+        'netCashFlow' => $this->getNetCashFlow(),
+        'monthlyComparison' => $this->getMonthlyComparison(),
+        'topExpenseCategories' => $this->getTopExpenseCategories(),
+        'lastThreeExpenses' => $this->getLastThreeExpenses(),
+        'todayTransactions' => $this->getTodayTransactions(), // Add this line
+    ];
+}
+
 }

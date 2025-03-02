@@ -37,7 +37,6 @@ class StockComparisonWidget extends ChartWidget
         foreach ($items as $item) {
             $categories[] = $item->name;
 
-            // Get latest stock records for each item
             $systemStock = StockRecord::where('item_id', $item->id)
                 ->latest('recorded_at')
                 ->first();
@@ -72,7 +71,7 @@ class StockComparisonWidget extends ChartWidget
         return [
             'chart' => [
                 'type' => 'bar',
-                'height' => 300,
+                'height' => 350,
             ],
             'series' => [
                 [
@@ -92,7 +91,8 @@ class StockComparisonWidget extends ChartWidget
                 ],
             ],
             'dataLabels' => [
-                'enabled' => false,
+                'enabled' => true,
+                'formatter' => 'function (val) { return val + " units"; }',
             ],
             'stroke' => [
                 'show' => true,
@@ -101,23 +101,38 @@ class StockComparisonWidget extends ChartWidget
             ],
             'xaxis' => [
                 'categories' => $data['labels'],
+                'labels' => [
+                    'rotate' => -45,
+                    'rotateAlways' => true,
+                ],
             ],
             'yaxis' => [
                 'title' => [
                     'text' => 'Stock Quantity',
                 ],
             ],
+            'grid' => [
+                'borderColor' => '#e7e7e7',
+                'row' => [
+                    'colors' => ['#f3f3f3', 'transparent'],
+                    'opacity' => 0.5,
+                ],
+            ],
             'fill' => [
                 'opacity' => 1,
             ],
             'tooltip' => [
+                'shared' => true,
+                'intersect' => false,
                 'y' => [
-                    'formatter' => 'function (val) {
-                        return val + " units"
-                    }',
+                    'formatter' => 'function (val) { return val + " units"; }',
                 ],
             ],
-            'colors' => ['#008FFB', '#FF4560'],
+            'colors' => ['#1E3A8A', '#10B981'],
+            'title' => [
+                'text' => 'Stock Comparison by Item',
+                'align' => 'left',
+            ],
         ];
     }
 
@@ -126,17 +141,41 @@ class StockComparisonWidget extends ChartWidget
         $data = $this->getData();
         $systemTotal = array_sum($data['datasets'][0]['data']);
         $shopTotal = array_sum($data['datasets'][1]['data']);
+        $total = $systemTotal + $shopTotal;
 
         return [
             'chart' => [
                 'type' => 'donut',
-                'height' => 300,
+                'height' => 350,
             ],
             'series' => [$systemTotal, $shopTotal],
             'labels' => ['System Stock', 'Shop Stock'],
-            'colors' => ['#008FFB', '#FF4560'],
+            'colors' => ['#1E3A8A', '#10B981'],
+            'dataLabels' => [
+                'enabled' => true,
+                'formatter' => 'function (val, opts) {
+                    return opts.w.config.series[opts.seriesIndex] + " units (" + val.toFixed(1) + "%)";
+                }',
+            ],
             'legend' => [
                 'position' => 'bottom',
+                'formatter' => 'function(seriesName, opts) {
+                    return seriesName + ": " + opts.w.globals.series[opts.seriesIndex] + " units";
+                }',
+            ],
+            'plotOptions' => [
+                'pie' => [
+                    'donut' => [
+                        'labels' => [
+                            'show' => true,
+                            'total' => [
+                                'show' => true,
+                                'label' => 'Total',
+                                'formatter' => 'function (w) { return "' . $total . ' units"; }',
+                            ],
+                        ],
+                    ],
+                ],
             ],
             'responsive' => [
                 [
