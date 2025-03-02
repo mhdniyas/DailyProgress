@@ -11,11 +11,148 @@ use Illuminate\Support\Carbon;
 class StockComparisonWidget extends ChartWidget
 {
     protected static ?string $heading = 'Stock Comparison';
-    
+
     protected int | string | array $columnSpan = 'full';
 
     public ?string $filter = 'all';
-    public ?string $timeframe = 'month'; // Default timeframe
+    public ?string $timeframe = 'month';
+
+    protected function getType(): string
+    {
+        return 'bar';
+    }
+
+    protected function getData(): array
+    {
+        $query = Item::query();
+        if ($this->filter !== 'all') {
+            $query->where('id', $this->filter);
+        }
+        $items = $query->get();
+
+        $systemStockData = [];
+        $shopStockData = [];
+        $categories = [];
+
+        foreach ($items as $item) {
+            $categories[] = $item->name;
+
+            // Get latest stock records for each item
+            $systemStock = StockRecord::where('item_id', $item->id)
+                ->latest('recorded_at')
+                ->first();
+
+            $shopStock = ShopStockRecord::where('item_id', $item->id)
+                ->latest('recorded_at')
+                ->first();
+
+            $systemStockData[] = $systemStock ? $systemStock->total_quantity : 0;
+            $shopStockData[] = $shopStock ? $shopStock->total_quantity : 0;
+        }
+
+        return [
+            'datasets' => [
+                [
+                    'label' => 'System Stock',
+                    'data' => $systemStockData,
+                ],
+                [
+                    'label' => 'Shop Stock',
+                    'data' => $shopStockData,
+                ],
+            ],
+            'labels' => $categories,
+        ];
+    }
+
+    protected function getOptions(): array
+    {
+        $data = $this->getData();
+
+        return [
+            'chart' => [
+                'type' => 'bar',
+                'height' => 300,
+            ],
+            'series' => [
+                [
+                    'name' => 'System Stock',
+                    'data' => $data['datasets'][0]['data'],
+                ],
+                [
+                    'name' => 'Shop Stock',
+                    'data' => $data['datasets'][1]['data'],
+                ],
+            ],
+            'plotOptions' => [
+                'bar' => [
+                    'horizontal' => false,
+                    'columnWidth' => '55%',
+                    'endingShape' => 'rounded',
+                ],
+            ],
+            'dataLabels' => [
+                'enabled' => false,
+            ],
+            'stroke' => [
+                'show' => true,
+                'width' => 2,
+                'colors' => ['transparent'],
+            ],
+            'xaxis' => [
+                'categories' => $data['labels'],
+            ],
+            'yaxis' => [
+                'title' => [
+                    'text' => 'Stock Quantity',
+                ],
+            ],
+            'fill' => [
+                'opacity' => 1,
+            ],
+            'tooltip' => [
+                'y' => [
+                    'formatter' => 'function (val) {
+                        return val + " units"
+                    }',
+                ],
+            ],
+            'colors' => ['#008FFB', '#FF4560'],
+        ];
+    }
+
+    protected function getDonutOptions(): array
+    {
+        $data = $this->getData();
+        $systemTotal = array_sum($data['datasets'][0]['data']);
+        $shopTotal = array_sum($data['datasets'][1]['data']);
+
+        return [
+            'chart' => [
+                'type' => 'donut',
+                'height' => 300,
+            ],
+            'series' => [$systemTotal, $shopTotal],
+            'labels' => ['System Stock', 'Shop Stock'],
+            'colors' => ['#008FFB', '#FF4560'],
+            'legend' => [
+                'position' => 'bottom',
+            ],
+            'responsive' => [
+                [
+                    'breakpoint' => 480,
+                    'options' => [
+                        'chart' => [
+                            'width' => 200,
+                        ],
+                        'legend' => [
+                            'position' => 'bottom',
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
 
     protected function getFilters(): ?array
     {
@@ -39,102 +176,8 @@ class StockComparisonWidget extends ChartWidget
         ];
     }
 
-    protected function getData(): array
+    protected static function getView(): string
     {
-        $dates = collect();
-        $startDate = Carbon::create(2025, 2, 27);
-        
-        // Set end date based on timeframe
-        switch ($this->timeframe) {
-            case 'week':
-                $endDate = $startDate->copy()->addDays(7);
-                $interval = '1 day';
-                $format = 'Y-m-d';
-                break;
-            case 'month':
-                $endDate = $startDate->copy()->addMonth();
-                $interval = '1 day';
-                $format = 'Y-m-d';
-                break;
-            case 'year':
-                $endDate = $startDate->copy()->addYear();
-                $interval = '1 month';
-                $format = 'Y-m';
-                break;
-            default:
-                $endDate = $startDate->copy()->addMonth();
-                $interval = '1 day';
-                $format = 'Y-m-d';
-        }
-
-        // Generate dates based on interval
-        for ($date = $startDate->copy(); $date->lte($endDate); ) {
-            $dates->push($date->format($format));
-            if ($interval === '1 day') {
-                $date->addDay();
-            } else {
-                $date->addMonth();
-            }
-        }
-
-        $query = Item::query();
-        if ($this->filter !== 'all') {
-            $query->where('id', $this->filter);
-        }
-        $items = $query->get();
-
-        $datasets = [];
-        foreach ($items as $item) {
-            // System Stock Dataset
-            $systemData = $this->getStockData(StockRecord::class, $item->id, $dates, $startDate, $endDate, $format);
-            $datasets[] = [
-                'label' => $item->name . ' (System)',
-                'data' => $systemData,
-                'borderColor' => 'rgb(75, 192, 192)',
-                'tension' => 0.1
-            ];
-
-            // Shop Stock Dataset
-            $shopData = $this->getStockData(ShopStockRecord::class, $item->id, $dates, $startDate, $endDate, $format);
-            $datasets[] = [
-                'label' => $item->name . ' (Shop)',
-                'data' => $shopData,
-                'borderColor' => 'rgb(255, 99, 132)',
-                'tension' => 0.1
-            ];
-        }
-
-        return [
-            'labels' => $dates->values(),
-            'datasets' => $datasets,
-        ];
-    }
-
-    protected function getStockData($model, $itemId, $dates, $startDate, $endDate, $format)
-    {
-        $records = $model::where('item_id', $itemId)
-            ->whereBetween('recorded_at', [$startDate->startOfDay(), $endDate->endOfDay()])
-            ->orderBy('recorded_at', 'asc')
-            ->get();
-
-        if ($format === 'Y-m') {
-            // Group by month for yearly view
-            $records = $records->groupBy(function ($record) {
-                return $record->recorded_at->format('Y-m');
-            })->map(function ($group) {
-                return $group->last()->total_quantity;
-            });
-        } else {
-            $records = $records->keyBy(fn ($record) => $record->recorded_at->format($format));
-        }
-
-        return $dates->map(function ($date) use ($records) {
-            return $records[$date]->total_quantity ?? 0;
-        })->values();
-    }
-
-    protected function getType(): string
-    {
-        return 'line';
+        return 'filament.widgets.stock-comparison-charts';
     }
 }
