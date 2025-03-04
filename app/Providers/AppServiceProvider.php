@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Filament\Support\Assets\Js;
+use Filament\Support\Facades\FilamentAsset;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -14,11 +16,12 @@ class AppServiceProvider extends ServiceProvider
         //
     }
 
-    /**
-     * Bootstrap any application services.
-     */
-    public function boot(): void
-    {
-        //
-    }
+
+public function boot(): void
+{
+    FilamentAsset::register([
+        Js::make('apexcharts', 'https://cdn.jsdelivr.net/npm/apexcharts')->async(),
+    ]);
+}
+
 }

@@ -1,13 +1,15 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasUserScope;
 
 class Item extends Model
 {
+    use HasUserScope;
     protected $fillable = [
         'name',
+        'user_id',
         'code',
         'type',
         'category',
@@ -55,5 +57,9 @@ class Item extends Model
             self::UNIT_BAG => 'Bag'
         ];
     }
-    
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }
+

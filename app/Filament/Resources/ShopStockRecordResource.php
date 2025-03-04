@@ -12,23 +12,33 @@ use Filament\Tables\Table;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\Hidden;
 
 class ShopStockRecordResource extends Resource
 {
     protected static ?string $model = ShopStockRecord::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-bag';
-    
+
     protected static ?string $navigationLabel = 'Shop Stock Records';
+
+    protected static ?string $navigationGroup = 'Stock Management';
 
     protected static ?string $modelLabel = 'Shop Stock Record';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('user_id', auth()->id());
+    }
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\Section::make('Stock Details')
                     ->schema([
+                        Hidden::make('user_id')
+                            ->default(auth()->id()),
+
                         Forms\Components\Select::make('item_id')
                             ->relationship('item', 'name')
                             ->required()
@@ -110,7 +120,7 @@ class ShopStockRecordResource extends Resource
                 SelectFilter::make('item_id')
                     ->relationship('item', 'name')
                     ->label('Item'),
-                
+
                 Filter::make('recorded_at')
                     ->form([
                         Forms\Components\DatePicker::make('recorded_from')
