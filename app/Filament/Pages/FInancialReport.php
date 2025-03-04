@@ -13,10 +13,20 @@ use Filament\Forms\Form;
 use Filament\Actions\Action;
 use Filament\Support\Exceptions\Halt;
 use Filament\Notifications\Notification;
+use Filament\Tables\Table;
+use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
+use Illuminate\Database\Eloquent\Collection as EloquentCollection;
+use Filament\Tables\Columns\Summarizers\Sum;
+use App\Models\TransactionSummary;
 
-class FinancialReport extends Page
+class FinancialReport extends Page implements HasTable
 {
     use InteractsWithForms;
+    use InteractsWithTable;
 
     protected static ?string $navigationGroup = 'Money Management';
     protected static ?string $navigationIcon = 'heroicon-o-chart-bar';
@@ -34,6 +44,179 @@ class FinancialReport extends Page
         $this->endDate = now()->format('Y-m-d');
     }
 
+    public function table(Table $table): Table
+    {
+        return $table
+            ->query(function () {
+                return $this->getTransactionSummariesQuery();
+            })
+            ->columns([
+                TextColumn::make('period')
+                    ->label('Period')
+                    ->sortable()
+                    ->searchable(),
+
+                TextColumn::make('credit')
+                    ->label('Credit')
+                    ->money('INR')
+                    ->sortable(),
+
+                TextColumn::make('debit')
+                    ->label('Debit')
+                    ->money('INR')
+                    ->sortable(),
+
+                TextColumn::make('balance')
+                    ->label('Balance')
+                    ->money('INR')
+                    ->sortable()
+                    ->state(function ($record) {
+                        return $record['credit'] - $record['debit'];
+                    })
+                    ->color(function ($state) {
+                        return $state > 0 ? 'success' : 'danger';
+                    }),
+            ])
+            ->defaultSort('period', 'desc')
+            ->striped()
+            ->paginated(false)
+            ->contentGrid([
+                'md' => 1, // Single column layout for consistency with other cards
+            ]);
+    }
+
+
+    protected function getTransactionSummariesQuery(): Builder
+{
+    $summaries = [
+        [
+            'id' => 1, // Add unique identifier
+            'period' => 'Daily',
+            'credit' => $this->getDailySummary()['credit'],
+            'debit' => $this->getDailySummary()['debit'],
+            'sort_order' => 1,
+        ],
+        [
+            'id' => 2, // Add unique identifier
+            'period' => 'Weekly',
+            'credit' => $this->getWeeklySummary()['credit'],
+            'debit' => $this->getWeeklySummary()['debit'],
+            'sort_order' => 2,
+        ],
+        [
+            'id' => 3, // Add unique identifier
+            'period' => 'Monthly',
+            'credit' => $this->getMonthlySummary()['credit'],
+            'debit' => $this->getMonthlySummary()['debit'],
+            'sort_order' => 3,
+        ],
+        [
+            'id' => 4, // Add unique identifier
+            'period' => 'Yearly',
+            'credit' => $this->getYearlySummary()['credit'],
+            'debit' => $this->getYearlySummary()['debit'],
+            'sort_order' => 4,
+        ],
+    ];
+
+    // Create a temporary table to store the summaries
+    $query = DB::table(function ($query) use ($summaries) {
+        $first = true;
+        foreach ($summaries as $summary) {
+            if ($first) {
+                $query->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
+                    $summary['id'],
+                    $summary['period'],
+                    $summary['credit'],
+                    $summary['debit'],
+                    $summary['sort_order'],
+                ]);
+                $first = false;
+            } else {
+                $query->unionAll(
+                    DB::query()->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
+                        $summary['id'],
+                        $summary['period'],
+                        $summary['credit'],
+                        $summary['debit'],
+                        $summary['sort_order'],
+                    ])
+                );
+            }
+        }
+    }, 'summaries');
+
+    // Convert to Eloquent Builder
+    return Transaction::setQuery($query);
+}
+
+// Add this method to specify the record key
+public function getTableRecordKey($record): string
+{
+    return (string) $record->id;
+}
+
+
+    private function getDailySummary()
+    {
+        $today = Carbon::today();
+
+        return [
+            'credit' => Transaction::where('type', 'credit')
+                ->whereDate('date', $today)
+                ->sum('amount'),
+            'debit' => Transaction::where('type', 'debit')
+                ->whereDate('date', $today)
+                ->sum('amount'),
+        ];
+    }
+
+    private function getWeeklySummary()
+{
+    $endDate = Carbon::now();
+    $startDate = Carbon::now()->subDays(6); // This will give last 7 days including today
+
+    return [
+        'credit' => Transaction::where('type', 'credit')
+            ->whereDate('date', '>=', $startDate)
+            ->whereDate('date', '<=', $endDate)
+            ->sum('amount'),
+        'debit' => Transaction::where('type', 'debit')
+            ->whereDate('date', '>=', $startDate)
+            ->whereDate('date', '<=', $endDate)
+            ->sum('amount'),
+    ];
+}
+
+    private function getMonthlySummary()
+    {
+        $startOfMonth = Carbon::now()->startOfMonth();
+        $endOfMonth = Carbon::now()->endOfMonth();
+
+        return [
+            'credit' => Transaction::where('type', 'credit')
+                ->whereBetween('date', [$startOfMonth, $endOfMonth])
+                ->sum('amount'),
+            'debit' => Transaction::where('type', 'debit')
+                ->whereBetween('date', [$startOfMonth, $endOfMonth])
+                ->sum('amount'),
+        ];
+    }
+
+    private function getYearlySummary()
+    {
+        $startOfYear = Carbon::now()->startOfYear();
+        $endOfYear = Carbon::now()->endOfYear();
+
+        return [
+            'credit' => Transaction::where('type', 'credit')
+                ->whereBetween('date', [$startOfYear, $endOfYear])
+                ->sum('amount'),
+            'debit' => Transaction::where('type', 'debit')
+                ->whereBetween('date', [$startOfYear, $endOfYear])
+                ->sum('amount'),
+        ];
+    }
     public function form(Form $form): Form
     {
         return $form
@@ -105,18 +288,14 @@ class FinancialReport extends Page
 
     public function getExpenseByCategory()
     {
-        $expenses = Transaction::where('type', 'debit')
+        return Transaction::where('type', 'debit')
             ->whereBetween('date', [$this->startDate, $this->endDate])
             ->select('category_id', DB::raw('SUM(amount) as total'))
             ->groupBy('category_id')
             ->with('category')
             ->get()
             ->mapWithKeys(fn ($item) => [$item->category->name => $item->total]);
-
-        return $expenses->toArray();
     }
-
-
 
     public function getExpenseByType()
     {
@@ -128,92 +307,22 @@ class FinancialReport extends Page
             ->mapWithKeys(fn ($item) => [$item->expense_type ?? 'N/A' => $item->total]);
     }
 
-    public function getTotalIncome()
-    {
-        return Transaction::where('type', 'credit')
-            ->whereBetween('date', [$this->startDate, $this->endDate])
-            ->sum('amount');
-    }
-
-    public function getTotalExpenses()
-    {
-        return Transaction::where('type', 'debit')
-            ->whereBetween('date', [$this->startDate, $this->endDate])
-            ->sum('amount');
-    }
-
-    public function getNetCashFlow()
-    {
-        return $this->getTotalIncome() - $this->getTotalExpenses();
-    }
-
-    public function getMonthlyComparison()
-    {
-        $start = Carbon::parse($this->startDate)->startOfMonth();
-        $end = Carbon::parse($this->endDate)->endOfMonth();
-        $months = [];
-
-        while ($start <= $end) {
-            $monthStart = $start->copy()->startOfMonth();
-            $monthEnd = $start->copy()->endOfMonth();
-
-            $income = Transaction::where('type', 'credit')
-                ->whereBetween('date', [$monthStart, $monthEnd])
-                ->sum('amount');
-
-            $expenses = Transaction::where('type', 'debit')
-                ->whereBetween('date', [$monthStart, $monthEnd])
-                ->sum('amount');
-
-            $months[] = [
-                'month' => $start->format('M Y'),
-                'income' => $income,
-                'expenses' => $expenses,
-                'net' => $income - $expenses,
-            ];
-
-            $start->addMonth();
-        }
-
-        return $months;
-    }
-
-    public function getTopExpenseCategories()
-    {
-        return Transaction::where('type', 'debit')
-            ->whereBetween('date', [$this->startDate, $this->endDate])
-            ->select('category_id', DB::raw('SUM(amount) as total'))
-            ->groupBy('category_id')
-            ->with('category')
-            ->orderByDesc('total')
-            ->take(5)
-            ->get()
-            ->map(function ($item) {
-                return [
-                    'category' => $item->category->name,
-                    'amount' => $item->total,
-                    'percentage' => ($item->total / $this->getTotalExpenses()) * 100,
-                ];
-            });
-    }
-
     protected function getHeaderActions(): array
     {
         return [
             Action::make('export_pdf')
                 ->label('Export PDF')
-                ->icon('heroicon-o-arrow-down-on-square') // Alternative icon
+                ->icon('heroicon-o-arrow-down-on-square')
                 ->color('success')
                 ->action('exportPdf'),
 
             Action::make('export_csv')
                 ->label('Export CSV')
-                ->icon('heroicon-o-document-arrow-down') // Alternative icon
+                ->icon('heroicon-o-document-arrow-down')
                 ->color('primary')
                 ->action('exportCsv'),
         ];
     }
-
 
     public function exportPdf()
     {
@@ -247,6 +356,98 @@ class FinancialReport extends Page
             throw new Halt();
         }
     }
+    private function getTotalIncome()
+{
+    return Transaction::where('type', 'credit')
+        ->whereBetween('date', [$this->startDate, $this->endDate])
+        ->sum('amount');
+}
+
+private function getTotalExpenses()
+{
+    return Transaction::where('type', 'debit')
+        ->whereBetween('date', [$this->startDate, $this->endDate])
+        ->sum('amount');
+}
+
+private function getNetCashFlow()
+{
+    return $this->getTotalIncome() - $this->getTotalExpenses();
+}
+
+private function getMonthlyComparison()
+{
+    $currentMonth = Carbon::now()->startOfMonth();
+    $lastMonth = Carbon::now()->subMonth()->startOfMonth();
+
+    $currentMonthData = [
+        'income' => Transaction::where('type', 'credit')
+            ->whereBetween('date', [$currentMonth, $currentMonth->copy()->endOfMonth()])
+            ->sum('amount'),
+        'expenses' => Transaction::where('type', 'debit')
+            ->whereBetween('date', [$currentMonth, $currentMonth->copy()->endOfMonth()])
+            ->sum('amount'),
+    ];
+
+    $lastMonthData = [
+        'income' => Transaction::where('type', 'credit')
+            ->whereBetween('date', [$lastMonth, $lastMonth->copy()->endOfMonth()])
+            ->sum('amount'),
+        'expenses' => Transaction::where('type', 'debit')
+            ->whereBetween('date', [$lastMonth, $lastMonth->copy()->endOfMonth()])
+            ->sum('amount'),
+    ];
+
+    return [
+        'current' => $currentMonthData,
+        'last' => $lastMonthData,
+    ];
+}
+
+private function getTopExpenseCategories()
+{
+    return Transaction::where('type', 'debit')
+        ->whereBetween('date', [$this->startDate, $this->endDate])
+        ->select('category_id', DB::raw('SUM(amount) as total'))
+        ->groupBy('category_id')
+        ->with('category')
+        ->orderByDesc('total')
+        ->take(5)
+        ->get()
+        ->map(function ($transaction) {
+            return [
+                'category' => $transaction->category->name ?? 'N/A',
+                'amount' => $transaction->total,
+            ];
+        });
+}
+
+private function getTodayTransactions()
+{
+    return Transaction::whereDate('date', Carbon::today())
+        ->with('category')
+        ->latest('date')
+        ->get()
+        ->map(function ($transaction) {
+            return [
+                'type' => ucfirst($transaction->type),
+                'category' => $transaction->category->name ?? 'N/A',
+                'amount' => $transaction->amount,
+                'description' => $transaction->description ?? 'No description',
+                'expense_type' => $transaction->expense_type ?? 'N/A',
+            ];
+        });
+}
+
+private function getTransactionSummaries()
+{
+    return [
+        'daily' => $this->getDailySummary(),
+        'weekly' => $this->getWeeklySummary(),
+        'monthly' => $this->getMonthlySummary(),
+        'yearly' => $this->getYearlySummary(),
+    ];
+}
 
     public function exportCsv()
     {
@@ -291,65 +492,23 @@ class FinancialReport extends Page
             throw new Halt();
         }
     }
-    public function getTodayCredit()
-{
-    return Transaction::where('type', 'credit')
-        ->whereDate('date', Carbon::today())
-        ->sum('amount');
-}
-
-public function getTodayDebit()
-{
-    return Transaction::where('type', 'debit')
-        ->whereDate('date', Carbon::today())
-        ->sum('amount');
-}
-
-public function getTodayTotal()
-{
-    return $this->getTodayCredit() - $this->getTodayDebit();
-}
-
-public function getTodayTransactions()
-{
-    return [
-        'credit' => [
-            'amount' => $this->getTodayCredit(),
-            'color' => 'success',
-            'label' => "Today's Credit",
-            'description' => 'Total income today'
-        ],
-        'debit' => [
-            'amount' => $this->getTodayDebit(),
-            'color' => 'danger',
-            'label' => "Today's Debit",
-            'description' => 'Total expenses today'
-        ],
-        'total' => [
-            'amount' => $this->getTodayTotal(),
-            'color' => $this->getTodayTotal() >= 0 ? 'success' : 'danger',
-            'label' => "Today's Balance",
-            'description' => 'Net cashflow today'
-        ]
-    ];
-}
 
     protected function getViewData(): array
-{
-    return [
-        'startDate' => $this->startDate,
-        'endDate' => $this->endDate,
-        'cashFlowData' => $this->getCashFlowData(),
-        'expenseByCategory' => $this->getExpenseByCategory(),
-        'expenseByType' => $this->getExpenseByType(),
-        'totalIncome' => $this->getTotalIncome(),
-        'totalExpenses' => $this->getTotalExpenses(),
-        'netCashFlow' => $this->getNetCashFlow(),
-        'monthlyComparison' => $this->getMonthlyComparison(),
-        'topExpenseCategories' => $this->getTopExpenseCategories(),
-        'lastThreeExpenses' => $this->getLastThreeExpenses(),
-        'todayTransactions' => $this->getTodayTransactions(), // Add this line
-    ];
-}
-
+    {
+        return [
+            'startDate' => $this->startDate,
+            'endDate' => $this->endDate,
+            'cashFlowData' => $this->getCashFlowData(),
+            'expenseByCategory' => $this->getExpenseByCategory(),
+            'expenseByType' => $this->getExpenseByType(),
+            'totalIncome' => $this->getTotalIncome(),
+            'totalExpenses' => $this->getTotalExpenses(),
+            'netCashFlow' => $this->getNetCashFlow(),
+            'monthlyComparison' => $this->getMonthlyComparison(),
+            'topExpenseCategories' => $this->getTopExpenseCategories(),
+            'lastThreeExpenses' => $this->getLastThreeExpenses(),
+            'todayTransactions' => $this->getTodayTransactions(),
+            'transactionSummaries' => $this->getTransactionSummaries(),
+        ];
+    }
 }

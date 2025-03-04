@@ -48,27 +48,25 @@
                                 </div>
                             </x-filament::card>
                         </div>
-                    {{-- Today's Transactions Summary --}}
+
+                        {{-- Today's Transactions Summary --}}
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-3">
                             @foreach($todayTransactions as $transaction)
                             <x-filament::card>
                                 <div class="flex justify-between items-start">
                                     <div>
-                                        <h3 class="text-lg font-semibold"></h3>
+                                        <h3 class="text-lg font-semibold">{{ $transaction['category'] }}</h3>
                                         <p class="text-sm text-gray-500">{{ $transaction['description'] }}</p>
                                     </div>
                                     <div class="text-right">
-                                        <span class="text-lg font-bold text-{{ $transaction['color'] }}-600">
+                                        <span class="text-lg font-bold text-{{ $transaction['type'] === 'Credit' ? 'emerald' : 'rose' }}-600">
                                             ₹{{ number_format($transaction['amount'], 2) }}
                                         </span>
                                     </div>
-
                                 </div>
-
                             </x-filament::card>
                             @endforeach
                         </div>
-
 
                         {{-- Last 3 Expenses --}}
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 p-3">
@@ -76,12 +74,8 @@
                             <x-filament::card>
                                 <div class="flex justify-between items-start">
                                     <div>
-                                        <h3 class="text-lg font-semibold">
-                                            {{ $expense['category'] }}
-                                        </h3>
-                                        <p class="text-sm text-gray-500">
-                                            {{ $expense['date'] }}
-                                        </p>
+                                        <h3 class="text-lg font-semibold">{{ $expense['category'] }}</h3>
+                                        <p class="text-sm text-gray-500">{{ $expense['date'] }}</p>
                                     </div>
                                     <div class="text-right">
                                         <span class="text-lg font-bold text-rose-600">
@@ -98,14 +92,20 @@
                             @endforeach
                         </div>
 
+                        {{-- Transaction Summaries Table --}}
+                        <div class="mb-6 p-3">
+                            <x-filament::card>
+                                <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Transaction Summaries</h3>
+                                {{ $this->table }}
+                            </x-filament::card>
+                        </div>
+
                         {{-- Charts Section --}}
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 p-3">
                             {{-- Expenses by Category Chart --}}
                             <div class="relative">
-                                <div
-                                    class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Expenses by
-                                        Category</h3>
+                                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Expenses by Category</h3>
                                     <div class="h-80" wire:ignore>
                                         <div x-data="{
                                             chart: null,
@@ -121,14 +121,8 @@
                                                         animations: {
                                                             enabled: true,
                                                             speed: 500,
-                                                            animateGradually: {
-                                                                enabled: true,
-                                                                delay: 150
-                                                            },
-                                                            dynamicAnimation: {
-                                                                enabled: true,
-                                                                speed: 350
-                                                            }
+                                                            animateGradually: { enabled: true, delay: 150 },
+                                                            dynamicAnimation: { enabled: true, speed: 350 }
                                                         },
                                                         fontFamily: 'Inter var'
                                                     },
@@ -145,7 +139,7 @@
                                                                         show: true,
                                                                         label: 'Total Expenses',
                                                                         formatter: function(w) {
-                                                                            return '₹' + w.globals.series.reduce((a, b) => a + b, 0).toLocaleString()
+                                                                            return '₹' + w.globals.series.reduce((a, b) => a + b, 0).toLocaleString();
                                                                         }
                                                                     }
                                                                 }
@@ -155,26 +149,22 @@
                                                     dataLabels: {
                                                         enabled: true,
                                                         formatter: function(val, opts) {
-                                                            return opts.w.config.labels[opts.seriesIndex] + ': ' + val.toFixed(1) + '%'
+                                                            return opts.w.config.labels[opts.seriesIndex] + ': ' + val.toFixed(1) + '%';
                                                         }
                                                     },
                                                     legend: {
                                                         position: 'bottom',
                                                         horizontalAlign: 'center',
-                                                        labels: {
-                                                            colors: '#6B7280'
-                                                        }
+                                                        labels: { colors: '#6B7280' }
                                                     },
                                                     tooltip: {
                                                         y: {
                                                             formatter: function(value) {
-                                                                return '₹' + value.toLocaleString()
+                                                                return '₹' + value.toLocaleString();
                                                             }
                                                         }
                                                     },
-                                                    stroke: {
-                                                        width: 2
-                                                    }
+                                                    stroke: { width: 2 }
                                                 });
                                                 this.chart.render();
                                             }
@@ -187,10 +177,8 @@
 
                             {{-- Cash Flow Trend Chart --}}
                             <div class="relative">
-                                <div
-                                    class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-                                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Cash Flow
-                                        Trend</h3>
+                                <div class="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+                                    <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">Cash Flow Trend</h3>
                                     <div class="h-80" wire:ignore>
                                         <div x-data="{
                                             chart: null,
@@ -201,17 +189,12 @@
                                                     chart: {
                                                         type: 'area',
                                                         height: 300,
-                                                        toolbar: {
-                                                            show: false
-                                                        },
+                                                        toolbar: { show: false },
                                                         animations: {
                                                             enabled: true,
                                                             easing: 'easeinout',
                                                             speed: 800,
-                                                            animateGradually: {
-                                                                enabled: true,
-                                                                delay: 150
-                                                            }
+                                                            animateGradually: { enabled: true, delay: 150 }
                                                         },
                                                         fontFamily: 'Inter var'
                                                     },
@@ -232,48 +215,33 @@
                                                             stops: [0, 90, 100]
                                                         }
                                                     },
-                                                    stroke: {
-                                                        curve: 'smooth',
-                                                        width: 2
-                                                    },
+                                                    stroke: { curve: 'smooth', width: 2 },
                                                     xaxis: {
                                                         categories: data.map(item => item.week),
-                                                        labels: {
-                                                            style: {
-                                                                colors: '#6B7280'
-                                                            }
-                                                        }
+                                                        labels: { style: { colors: '#6B7280' } }
                                                     },
                                                     yaxis: {
                                                         labels: {
                                                             formatter: function(value) {
-                                                                return '₹' + value.toLocaleString()
+                                                                return '₹' + value.toLocaleString();
                                                             },
-                                                            style: {
-                                                                colors: '#6B7280'
-                                                            }
+                                                            style: { colors: '#6B7280' }
                                                         }
                                                     },
                                                     grid: {
                                                         borderColor: '#E5E7EB',
                                                         strokeDashArray: 4,
-                                                        xaxis: {
-                                                            lines: {
-                                                                show: true
-                                                            }
-                                                        }
+                                                        xaxis: { lines: { show: true } }
                                                     },
                                                     legend: {
                                                         position: 'top',
                                                         horizontalAlign: 'right',
-                                                        labels: {
-                                                            colors: '#6B7280'
-                                                        }
+                                                        labels: { colors: '#6B7280' }
                                                     },
                                                     tooltip: {
                                                         y: {
                                                             formatter: function(value) {
-                                                                return '₹' + value.toLocaleString()
+                                                                return '₹' + value.toLocaleString();
                                                             }
                                                         }
                                                     }
@@ -298,11 +266,9 @@
             import { FinancialVisualizer } from '../../js/financial-3d.js';
 
             document.addEventListener('DOMContentLoaded', () => {
-                // Initialize toggle button for switching between 2D and 3D views
                 const container = document.getElementById('financial-3d-view');
                 const dataContainer = document.getElementById('financial-data-container');
 
-                // Create a toggle button
                 const toggleButton = document.createElement('button');
                 toggleButton.textContent = 'Switch to 3D View';
                 toggleButton.className = 'px-4 py-2 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-md text-gray-900 dark:text-gray-100 mb-4';
@@ -310,29 +276,21 @@
 
                 let is3DActive = false;
                 const visualizer = new FinancialVisualizer('financial-3d-view');
-
-                // Get the expense data from PHP
                 const expenseData = @json($expenseByCategory);
 
                 toggleButton.addEventListener('click', () => {
                     is3DActive = !is3DActive;
 
                     if (is3DActive) {
-                        // Hide the regular data view
                         dataContainer.style.display = 'none';
-                        container.style.height = '600px'; // Give more space for 3D visualization
+                        container.style.height = '600px';
                         toggleButton.textContent = 'Switch to Standard View';
-
-                        // Initialize and start the 3D visualization
                         visualizer.visualizeExpenses(expenseData);
                         visualizer.animate();
                     } else {
-                        // Show the regular data view
                         dataContainer.style.display = 'block';
                         container.style.height = 'auto';
                         toggleButton.textContent = 'Switch to 3D View';
-
-                        // Stop the 3D visualization
                         visualizer.stop();
                     }
                 });
