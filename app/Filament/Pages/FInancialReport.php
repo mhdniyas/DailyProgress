@@ -85,6 +85,31 @@ class FinancialReport extends Page implements HasTable
             ]);
     }
 
+// Add these new methods to your FinancialReport class
+
+public function getDailyTransactionsForCalendar()
+{
+    $start = Carbon::parse($this->startDate)->startOfMonth();
+    $end = Carbon::parse($this->endDate)->endOfMonth();
+
+    $transactions = Transaction::whereBetween('date', [$start, $end])
+        ->select(
+            DB::raw('DATE(date) as date'),
+            DB::raw('SUM(CASE WHEN type = "credit" THEN amount ELSE 0 END) as credit'),
+            DB::raw('SUM(CASE WHEN type = "debit" THEN amount ELSE 0 END) as debit')
+        )
+        ->groupBy('date')
+        ->get()
+        ->mapWithKeys(function ($item) {
+            return [$item->date => [
+                'credit' => (float)$item->credit,
+                'debit' => (float)$item->debit,
+            ]];
+        })->toArray();
+
+    return $transactions;
+}
+
 
     protected function getTransactionSummariesQuery(): Builder
 {
@@ -509,6 +534,7 @@ private function getTransactionSummaries()
             'lastThreeExpenses' => $this->getLastThreeExpenses(),
             'todayTransactions' => $this->getTodayTransactions(),
             'transactionSummaries' => $this->getTransactionSummaries(),
+            'calendarData' => $this->getDailyTransactionsForCalendar(),
         ];
     }
 }

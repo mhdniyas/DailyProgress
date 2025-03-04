@@ -256,9 +256,18 @@
                             </div>
                         </div>
                     </div>
+    `               <div class="mb-6 p-3">
+                        <x-filament::card>
+                        <h2 class="text-lg font-semibold mb-4">Daily Transactions Calendar</h2>
+                        <div id="financial-calendar"
+                            data-transactions="{{ json_encode($calendarData) }}"
+                            class="w-full"></div>
+                        </x-filament::card>
+                    </div>
                 </div>
             </div>
         </x-filament::card>
+
 
         @push('scripts')
         <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
@@ -296,6 +305,98 @@
                 });
             });
         </script>
+        <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+        <script>
+            document.addEventListener('DOMContentLoaded', function() {
+                var calendarEl = document.getElementById('financial-calendar');
+                var transactions = JSON.parse(calendarEl.dataset.transactions);
+
+                var calendar = new FullCalendar.Calendar(calendarEl, {
+                    initialView: 'dayGridMonth',
+                    headerToolbar: {
+                        left: 'prev,next today',
+                        center: 'title',
+                        right: ''
+                    },
+                    events: Object.entries(transactions).map(([date, data]) => ({
+                        title: `Credit: ₹${data.credit.toLocaleString('en-IN')}\nDebit: ₹${data.debit.toLocaleString('en-IN')}`,
+                        start: date,
+                        backgroundColor: data.credit > data.debit ? '#10B981' : '#EF4444',
+                        borderColor: data.credit > data.debit ? '#059669' : '#DC2626',
+                        textColor: '#ffffff',
+                        extendedProps: {
+                            credit: data.credit,
+                            debit: data.debit
+                        }
+                    })),
+                    eventContent: function(arg) {
+                        return {
+                            html: `
+                                <div class="fc-event-main p-1">
+                                    <div class="text-xs font-medium">Credit: ₹${arg.event.extendedProps.credit.toLocaleString('en-IN')}</div>
+                                    <div class="text-xs font-medium">Debit: ₹${arg.event.extendedProps.debit.toLocaleString('en-IN')}</div>
+                                </div>
+                            `
+                        }
+                    },
+                    eventMouseEnter: function(info) {
+                        tippy(info.el, {
+                            content: `
+                                <div class="bg-gray-800 text-white p-2 rounded shadow-lg">
+                                    <p>Date: ${info.event.start.toLocaleDateString()}</p>
+                                    <p>Credit: ₹${info.event.extendedProps.credit.toLocaleString('en-IN')}</p>
+                                    <p>Debit: ₹${info.event.extendedProps.debit.toLocaleString('en-IN')}</p>
+                                    <p>Net: ₹${(info.event.extendedProps.credit - info.event.extendedProps.debit).toLocaleString('en-IN')}</p>
+                                </div>
+                            `,
+                            allowHTML: true,
+                            theme: 'dark'
+                        });
+                    },
+                    height: 'auto',
+                    dayMaxEvents: true,
+                    eventDisplay: 'block',
+                });
+
+                calendar.render();
+            });
+        </script>
         @endpush
+        @push('styles')
+<link href="https://cdn.jsdelivr.net/npm/tippy.js@6.3.7/dist/tippy.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tippy.js@6.3.7/dist/tippy-bundle.umd.min.js"></script>
+<style>
+    #financial-calendar {
+        max-width: 100%;
+    }
+
+    .fc {
+        --fc-small-font-size: 0.85em;
+        --fc-bg-event-opacity: 0.9;
+    }
+
+    .fc-daygrid-day-number {
+        color: #374151;
+        font-weight: 500;
+    }
+
+    .fc-daygrid-event {
+        margin: 2px;
+        padding: 2px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        line-height: 1.2;
+    }
+
+    .fc .fc-daygrid-day-top {
+        display: flex;
+        justify-content: center;
+    }
+
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #F3F4F6;
+    }
+</style>
+@endpush
     </div>
 </x-filament::page>
