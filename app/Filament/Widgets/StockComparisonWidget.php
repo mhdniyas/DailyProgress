@@ -24,7 +24,9 @@ class StockComparisonWidget extends ChartWidget
 
     protected function getData(): array
     {
-        $query = Item::query();
+        $userId = auth()->id();
+
+        $query = Item::query()->where('user_id', $userId);
         if ($this->filter !== 'all') {
             $query->where('id', $this->filter);
         }
@@ -37,11 +39,13 @@ class StockComparisonWidget extends ChartWidget
         foreach ($items as $item) {
             $categories[] = $item->name;
 
-            $systemStock = StockRecord::where('item_id', $item->id)
+            $systemStock = StockRecord::where('user_id', $userId)
+                ->where('item_id', $item->id)
                 ->latest('recorded_at')
                 ->first();
 
-            $shopStock = ShopStockRecord::where('item_id', $item->id)
+            $shopStock = ShopStockRecord::where('user_id', $userId)
+                ->where('item_id', $item->id)
                 ->latest('recorded_at')
                 ->first();
 
@@ -62,6 +66,20 @@ class StockComparisonWidget extends ChartWidget
             ],
             'labels' => $categories,
         ];
+    }
+
+    protected function getFilters(): ?array
+    {
+        $userId = auth()->id();
+        $filters = [
+            'all' => 'All Items',
+        ];
+
+        foreach (Item::where('user_id', $userId)->get() as $item) {
+            $filters[$item->id] = $item->name;
+        }
+
+        return $filters;
     }
 
     protected function getOptions(): array
@@ -193,19 +211,6 @@ class StockComparisonWidget extends ChartWidget
         ];
     }
 
-    protected function getFilters(): ?array
-    {
-        $filters = [
-            'all' => 'All Items',
-        ];
-
-        foreach (Item::all() as $item) {
-            $filters[$item->id] = $item->name;
-        }
-
-        return $filters;
-    }
-
     protected function getTimeframeFilters(): ?array
     {
         return [
@@ -213,10 +218,5 @@ class StockComparisonWidget extends ChartWidget
             'month' => 'Month',
             'year' => 'Year',
         ];
-    }
-
-    protected static function getView(): string
-    {
-        return 'filament.widgets.stock-comparison-charts';
     }
 }

@@ -1,15 +1,17 @@
 <?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use App\Traits\HasUserScope;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ShopStockRecord extends Model
 {
+    use HasUserScope;
     protected $fillable = [
         'item_id',
         'number_of_bags',
+        'user_id',
         'average_quantity',
         'total_quantity',
         'notes',

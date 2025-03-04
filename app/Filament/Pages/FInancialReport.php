@@ -43,7 +43,10 @@ class FinancialReport extends Page implements HasTable
         $this->startDate = now()->subWeeks(4)->format('Y-m-d');
         $this->endDate = now()->format('Y-m-d');
     }
-
+    public function getHeading(): string
+{
+    return 'Financial Report - ' . auth()->user()->name;
+}
     public function table(Table $table): Table
     {
         return $table
@@ -81,137 +84,135 @@ class FinancialReport extends Page implements HasTable
             ->striped()
             ->paginated(false)
             ->contentGrid([
-                'md' => 1, // Single column layout for consistency with other cards
+                'md' => 1,
             ]);
     }
 
-// Add these new methods to your FinancialReport class
+    public function getDailyTransactionsForCalendar()
+    {
+        $start = Carbon::parse($this->startDate)->startOfMonth();
+        $end = Carbon::parse($this->endDate)->endOfMonth();
 
-public function getDailyTransactionsForCalendar()
-{
-    $start = Carbon::parse($this->startDate)->startOfMonth();
-    $end = Carbon::parse($this->endDate)->endOfMonth();
+        $transactions = Transaction::where('user_id', auth()->id())
+            ->whereBetween('date', [$start, $end])
+            ->select(
+                DB::raw('DATE(date) as date'),
+                DB::raw('SUM(CASE WHEN type = "credit" THEN amount ELSE 0 END) as credit'),
+                DB::raw('SUM(CASE WHEN type = "debit" THEN amount ELSE 0 END) as debit')
+            )
+            ->groupBy('date')
+            ->get()
+            ->mapWithKeys(function ($item) {
+                return [$item->date => [
+                    'credit' => (float)$item->credit,
+                    'debit' => (float)$item->debit,
+                ]];
+            })->toArray();
 
-    $transactions = Transaction::whereBetween('date', [$start, $end])
-        ->select(
-            DB::raw('DATE(date) as date'),
-            DB::raw('SUM(CASE WHEN type = "credit" THEN amount ELSE 0 END) as credit'),
-            DB::raw('SUM(CASE WHEN type = "debit" THEN amount ELSE 0 END) as debit')
-        )
-        ->groupBy('date')
-        ->get()
-        ->mapWithKeys(function ($item) {
-            return [$item->date => [
-                'credit' => (float)$item->credit,
-                'debit' => (float)$item->debit,
-            ]];
-        })->toArray();
-
-    return $transactions;
-}
-
+        return $transactions;
+    }
 
     protected function getTransactionSummariesQuery(): Builder
-{
-    $summaries = [
-        [
-            'id' => 1, // Add unique identifier
-            'period' => 'Daily',
-            'credit' => $this->getDailySummary()['credit'],
-            'debit' => $this->getDailySummary()['debit'],
-            'sort_order' => 1,
-        ],
-        [
-            'id' => 2, // Add unique identifier
-            'period' => 'Weekly',
-            'credit' => $this->getWeeklySummary()['credit'],
-            'debit' => $this->getWeeklySummary()['debit'],
-            'sort_order' => 2,
-        ],
-        [
-            'id' => 3, // Add unique identifier
-            'period' => 'Monthly',
-            'credit' => $this->getMonthlySummary()['credit'],
-            'debit' => $this->getMonthlySummary()['debit'],
-            'sort_order' => 3,
-        ],
-        [
-            'id' => 4, // Add unique identifier
-            'period' => 'Yearly',
-            'credit' => $this->getYearlySummary()['credit'],
-            'debit' => $this->getYearlySummary()['debit'],
-            'sort_order' => 4,
-        ],
-    ];
+    {
+        $summaries = [
+            [
+                'id' => 1,
+                'period' => 'Daily',
+                'credit' => $this->getDailySummary()['credit'],
+                'debit' => $this->getDailySummary()['debit'],
+                'sort_order' => 1,
+            ],
+            [
+                'id' => 2,
+                'period' => 'Weekly',
+                'credit' => $this->getWeeklySummary()['credit'],
+                'debit' => $this->getWeeklySummary()['debit'],
+                'sort_order' => 2,
+            ],
+            [
+                'id' => 3,
+                'period' => 'Monthly',
+                'credit' => $this->getMonthlySummary()['credit'],
+                'debit' => $this->getMonthlySummary()['debit'],
+                'sort_order' => 3,
+            ],
+            [
+                'id' => 4,
+                'period' => 'Yearly',
+                'credit' => $this->getYearlySummary()['credit'],
+                'debit' => $this->getYearlySummary()['debit'],
+                'sort_order' => 4,
+            ],
+        ];
 
-    // Create a temporary table to store the summaries
-    $query = DB::table(function ($query) use ($summaries) {
-        $first = true;
-        foreach ($summaries as $summary) {
-            if ($first) {
-                $query->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
-                    $summary['id'],
-                    $summary['period'],
-                    $summary['credit'],
-                    $summary['debit'],
-                    $summary['sort_order'],
-                ]);
-                $first = false;
-            } else {
-                $query->unionAll(
-                    DB::query()->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
+        $query = DB::table(function ($query) use ($summaries) {
+            $first = true;
+            foreach ($summaries as $summary) {
+                if ($first) {
+                    $query->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
                         $summary['id'],
                         $summary['period'],
                         $summary['credit'],
                         $summary['debit'],
                         $summary['sort_order'],
-                    ])
-                );
+                    ]);
+                    $first = false;
+                } else {
+                    $query->unionAll(
+                        DB::query()->selectRaw("? as id, ? as period, ? as credit, ? as debit, ? as sort_order", [
+                            $summary['id'],
+                            $summary['period'],
+                            $summary['credit'],
+                            $summary['debit'],
+                            $summary['sort_order'],
+                        ])
+                    );
+                }
             }
-        }
-    }, 'summaries');
+        }, 'summaries');
 
-    // Convert to Eloquent Builder
-    return Transaction::setQuery($query);
-}
+        return Transaction::setQuery($query);
+    }
 
-// Add this method to specify the record key
-public function getTableRecordKey($record): string
-{
-    return (string) $record->id;
-}
-
+    public function getTableRecordKey($record): string
+    {
+        return (string) $record->id;
+    }
 
     private function getDailySummary()
     {
         $today = Carbon::today();
 
         return [
-            'credit' => Transaction::where('type', 'credit')
+            'credit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'credit')
                 ->whereDate('date', $today)
                 ->sum('amount'),
-            'debit' => Transaction::where('type', 'debit')
+            'debit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'debit')
                 ->whereDate('date', $today)
                 ->sum('amount'),
         ];
     }
 
     private function getWeeklySummary()
-{
-    $endDate = Carbon::now();
-    $startDate = Carbon::now()->subDays(6); // This will give last 7 days including today
+    {
+        $endDate = Carbon::now();
+        $startDate = Carbon::now()->subDays(6);
 
-    return [
-        'credit' => Transaction::where('type', 'credit')
-            ->whereDate('date', '>=', $startDate)
-            ->whereDate('date', '<=', $endDate)
-            ->sum('amount'),
-        'debit' => Transaction::where('type', 'debit')
-            ->whereDate('date', '>=', $startDate)
-            ->whereDate('date', '<=', $endDate)
-            ->sum('amount'),
-    ];
-}
+        return [
+            'credit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'credit')
+                ->whereDate('date', '>=', $startDate)
+                ->whereDate('date', '<=', $endDate)
+                ->sum('amount'),
+            'debit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'debit')
+                ->whereDate('date', '>=', $startDate)
+                ->whereDate('date', '<=', $endDate)
+                ->sum('amount'),
+        ];
+    }
 
     private function getMonthlySummary()
     {
@@ -219,10 +220,12 @@ public function getTableRecordKey($record): string
         $endOfMonth = Carbon::now()->endOfMonth();
 
         return [
-            'credit' => Transaction::where('type', 'credit')
+            'credit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'credit')
                 ->whereBetween('date', [$startOfMonth, $endOfMonth])
                 ->sum('amount'),
-            'debit' => Transaction::where('type', 'debit')
+            'debit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'debit')
                 ->whereBetween('date', [$startOfMonth, $endOfMonth])
                 ->sum('amount'),
         ];
@@ -234,14 +237,17 @@ public function getTableRecordKey($record): string
         $endOfYear = Carbon::now()->endOfYear();
 
         return [
-            'credit' => Transaction::where('type', 'credit')
+            'credit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'credit')
                 ->whereBetween('date', [$startOfYear, $endOfYear])
                 ->sum('amount'),
-            'debit' => Transaction::where('type', 'debit')
+            'debit' => Transaction::where('user_id', auth()->id())
+                ->where('type', 'debit')
                 ->whereBetween('date', [$startOfYear, $endOfYear])
                 ->sum('amount'),
         ];
     }
+
     public function form(Form $form): Form
     {
         return $form
@@ -272,11 +278,13 @@ public function getTableRecordKey($record): string
             $weekStart = $current->copy()->startOfWeek();
             $weekEnd = $current->copy()->endOfWeek();
 
-            $credits = Transaction::where('type', 'credit')
+            $credits = Transaction::where('user_id', auth()->id())
+                ->where('type', 'credit')
                 ->whereBetween('date', [$weekStart, $weekEnd])
                 ->sum('amount');
 
-            $debits = Transaction::where('type', 'debit')
+            $debits = Transaction::where('user_id', auth()->id())
+                ->where('type', 'debit')
                 ->whereBetween('date', [$weekStart, $weekEnd])
                 ->sum('amount');
 
@@ -295,7 +303,8 @@ public function getTableRecordKey($record): string
 
     public function getLastThreeExpenses()
     {
-        return Transaction::where('type', 'debit')
+        return Transaction::where('user_id', auth()->id())
+            ->where('type', 'debit')
             ->with('category')
             ->latest('date')
             ->take(3)
@@ -313,7 +322,8 @@ public function getTableRecordKey($record): string
 
     public function getExpenseByCategory()
     {
-        return Transaction::where('type', 'debit')
+        return Transaction::where('user_id', auth()->id())
+            ->where('type', 'debit')
             ->whereBetween('date', [$this->startDate, $this->endDate])
             ->select('category_id', DB::raw('SUM(amount) as total'))
             ->groupBy('category_id')
@@ -324,7 +334,8 @@ public function getTableRecordKey($record): string
 
     public function getExpenseByType()
     {
-        return Transaction::where('type', 'debit')
+        return Transaction::where('user_id', auth()->id())
+            ->where('type', 'debit')
             ->whereBetween('date', [$this->startDate, $this->endDate])
             ->select('expense_type', DB::raw('SUM(amount) as total'))
             ->groupBy('expense_type')
@@ -352,7 +363,8 @@ public function getTableRecordKey($record): string
     public function exportPdf()
     {
         try {
-            $transactions = Transaction::whereBetween('date', [$this->startDate, $this->endDate])
+            $transactions = Transaction::where('user_id', auth()->id())
+                ->whereBetween('date', [$this->startDate, $this->endDate])
                 ->with('category')
                 ->orderBy('date', 'desc')
                 ->get();
@@ -381,142 +393,45 @@ public function getTableRecordKey($record): string
             throw new Halt();
         }
     }
+
     private function getTotalIncome()
+    {
+        return Transaction::where('user_id', auth()->id())
+            ->where('type', 'credit')
+            ->whereBetween('date', [$this->startDate, $this->endDate])
+            ->sum('amount');
+    }
+
+    private function getTotalExpenses()
+    {
+        return Transaction::where('user_id', auth()->id())
+            ->where('type', 'debit')
+            ->whereBetween('date', [$this->startDate, $this->endDate])
+            ->sum('amount');
+    }
+
+    private function getNetCashFlow()
+    {
+        return $this->getTotalIncome() - $this->getTotalExpenses();
+    }
+    private function getTodayTransactions()
 {
-    return Transaction::where('type', 'credit')
-        ->whereBetween('date', [$this->startDate, $this->endDate])
-        ->sum('amount');
-}
+    $today = Carbon::today();
 
-private function getTotalExpenses()
-{
-    return Transaction::where('type', 'debit')
-        ->whereBetween('date', [$this->startDate, $this->endDate])
-        ->sum('amount');
-}
-
-private function getNetCashFlow()
-{
-    return $this->getTotalIncome() - $this->getTotalExpenses();
-}
-
-private function getMonthlyComparison()
-{
-    $currentMonth = Carbon::now()->startOfMonth();
-    $lastMonth = Carbon::now()->subMonth()->startOfMonth();
-
-    $currentMonthData = [
-        'income' => Transaction::where('type', 'credit')
-            ->whereBetween('date', [$currentMonth, $currentMonth->copy()->endOfMonth()])
-            ->sum('amount'),
-        'expenses' => Transaction::where('type', 'debit')
-            ->whereBetween('date', [$currentMonth, $currentMonth->copy()->endOfMonth()])
-            ->sum('amount'),
-    ];
-
-    $lastMonthData = [
-        'income' => Transaction::where('type', 'credit')
-            ->whereBetween('date', [$lastMonth, $lastMonth->copy()->endOfMonth()])
-            ->sum('amount'),
-        'expenses' => Transaction::where('type', 'debit')
-            ->whereBetween('date', [$lastMonth, $lastMonth->copy()->endOfMonth()])
-            ->sum('amount'),
-    ];
-
-    return [
-        'current' => $currentMonthData,
-        'last' => $lastMonthData,
-    ];
-}
-
-private function getTopExpenseCategories()
-{
-    return Transaction::where('type', 'debit')
-        ->whereBetween('date', [$this->startDate, $this->endDate])
-        ->select('category_id', DB::raw('SUM(amount) as total'))
-        ->groupBy('category_id')
-        ->with('category')
-        ->orderByDesc('total')
-        ->take(5)
+    return Transaction::where('user_id', auth()->id())
+        ->whereDate('date', $today)
+        ->orderBy('date', 'desc')
         ->get()
         ->map(function ($transaction) {
             return [
-                'category' => $transaction->category->name ?? 'N/A',
-                'amount' => $transaction->total,
-            ];
-        });
-}
-
-private function getTodayTransactions()
-{
-    return Transaction::whereDate('date', Carbon::today())
-        ->with('category')
-        ->latest('date')
-        ->get()
-        ->map(function ($transaction) {
-            return [
-                'type' => ucfirst($transaction->type),
                 'category' => $transaction->category->name ?? 'N/A',
                 'amount' => $transaction->amount,
+                'type' => $transaction->type,
                 'description' => $transaction->description ?? 'No description',
                 'expense_type' => $transaction->expense_type ?? 'N/A',
             ];
         });
 }
-
-private function getTransactionSummaries()
-{
-    return [
-        'daily' => $this->getDailySummary(),
-        'weekly' => $this->getWeeklySummary(),
-        'monthly' => $this->getMonthlySummary(),
-        'yearly' => $this->getYearlySummary(),
-    ];
-}
-
-    public function exportCsv()
-    {
-        try {
-            $transactions = Transaction::whereBetween('date', [$this->startDate, $this->endDate])
-                ->with('category')
-                ->get();
-
-            $csv = \League\Csv\Writer::createFromString('');
-
-            $csv->insertOne([
-                'Date',
-                'Type',
-                'Category',
-                'Amount (₹)',
-                'Description',
-                'Expense Type'
-            ]);
-
-            foreach ($transactions as $transaction) {
-                $csv->insertOne([
-                    $transaction->date,
-                    ucfirst($transaction->type),
-                    $transaction->category->name,
-                    number_format($transaction->amount, 2),
-                    $transaction->description ?? 'N/A',
-                    $transaction->expense_type ?? 'N/A',
-                ]);
-            }
-
-            return response($csv->toString(), 200, [
-                'Content-Type' => 'text/csv',
-                'Content-Disposition' => 'attachment; filename="financial-report.csv"',
-            ]);
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Export Failed')
-                ->body('Failed to generate CSV report.')
-                ->danger()
-                ->send();
-
-            throw new Halt();
-        }
-    }
 
     protected function getViewData(): array
     {
@@ -529,12 +444,9 @@ private function getTransactionSummaries()
             'totalIncome' => $this->getTotalIncome(),
             'totalExpenses' => $this->getTotalExpenses(),
             'netCashFlow' => $this->getNetCashFlow(),
-            'monthlyComparison' => $this->getMonthlyComparison(),
-            'topExpenseCategories' => $this->getTopExpenseCategories(),
             'lastThreeExpenses' => $this->getLastThreeExpenses(),
-            'todayTransactions' => $this->getTodayTransactions(),
-            'transactionSummaries' => $this->getTransactionSummaries(),
             'calendarData' => $this->getDailyTransactionsForCalendar(),
+            'todayTransactions' => $this->getTodayTransactions(),
         ];
     }
 }

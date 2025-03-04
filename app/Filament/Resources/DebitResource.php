@@ -11,6 +11,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
 use App\Filament\Resources\DebitResource\Pages;
+use Filament\Forms\Components\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 
 class DebitResource extends Resource
 {
@@ -19,10 +21,18 @@ class DebitResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-arrow-up';
     protected static ?string $navigationGroup = 'Money Management';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('user_id', auth()->id());
+    }
+
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form
             ->schema([
+                Hidden::make('user_id')
+                    ->default(auth()->id()),
+
                 Forms\Components\Hidden::make('type')
                     ->default('debit'),
 
@@ -89,7 +99,7 @@ class DebitResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
-            ->query(Transaction::query()->where('type', 'debit'))
+            ->query(static::getEloquentQuery()->where('type', 'debit'))
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('category.full_path')

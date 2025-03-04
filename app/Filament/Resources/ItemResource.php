@@ -10,6 +10,7 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\Hidden;
 
 class ItemResource extends Resource
 {
@@ -19,6 +20,10 @@ class ItemResource extends Resource
 
     protected static ?string $navigationGroup = 'Stock Management';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('user_id', auth()->id());
+    }
 
     public static function form(Form $form): Form
     {
@@ -26,6 +31,9 @@ class ItemResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Basic Information')
                     ->schema([
+                        Hidden::make('user_id')
+                            ->default(auth()->id()),
+
                         Forms\Components\TextInput::make('name')
                             ->required()
                             ->maxLength(255)

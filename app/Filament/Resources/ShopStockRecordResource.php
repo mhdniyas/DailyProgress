@@ -12,6 +12,7 @@ use Filament\Tables\Table;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Illuminate\Database\Eloquent\Builder;
+use Filament\Forms\Components\Hidden;
 
 class ShopStockRecordResource extends Resource
 {
@@ -25,12 +26,19 @@ class ShopStockRecordResource extends Resource
 
     protected static ?string $modelLabel = 'Shop Stock Record';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()->where('user_id', auth()->id());
+    }
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
                 Forms\Components\Section::make('Stock Details')
                     ->schema([
+                        Hidden::make('user_id')
+                            ->default(auth()->id()),
+
                         Forms\Components\Select::make('item_id')
                             ->relationship('item', 'name')
                             ->required()

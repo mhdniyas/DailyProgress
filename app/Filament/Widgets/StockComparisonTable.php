@@ -19,7 +19,9 @@ class StockComparisonTable extends BaseWidget
 
     protected function getTableQuery(): Builder|Relation|null
     {
-        return Item::query()->latest();
+        return Item::query()
+            ->where('user_id', auth()->id())
+            ->latest();
     }
 
     protected function getTableColumns(): array
@@ -33,7 +35,8 @@ class StockComparisonTable extends BaseWidget
             TextColumn::make('system_stock')
                 ->label('System Stock')
                 ->getStateUsing(function ($record) {
-                    $stock = StockRecord::where('item_id', $record->id)
+                    $stock = StockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
                     return $stock ? $stock->total_quantity : 0;
@@ -43,7 +46,8 @@ class StockComparisonTable extends BaseWidget
             TextColumn::make('shop_stock')
                 ->label('Shop Stock')
                 ->getStateUsing(function ($record) {
-                    $stock = ShopStockRecord::where('item_id', $record->id)
+                    $stock = ShopStockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
                     return $stock ? $stock->total_quantity : 0;
@@ -53,11 +57,13 @@ class StockComparisonTable extends BaseWidget
             TextColumn::make('difference')
                 ->label('Difference')
                 ->getStateUsing(function ($record) {
-                    $systemStock = StockRecord::where('item_id', $record->id)
+                    $systemStock = StockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
 
-                    $shopStock = ShopStockRecord::where('item_id', $record->id)
+                    $shopStock = ShopStockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
 
@@ -70,11 +76,13 @@ class StockComparisonTable extends BaseWidget
                     );
                 })
                 ->color(function ($record) {
-                    $systemStock = StockRecord::where('item_id', $record->id)
+                    $systemStock = StockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
 
-                    $shopStock = ShopStockRecord::where('item_id', $record->id)
+                    $shopStock = ShopStockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first()?->total_quantity ?? 0;
 
@@ -84,11 +92,13 @@ class StockComparisonTable extends BaseWidget
             TextColumn::make('last_updated')
                 ->label('Last Updated')
                 ->getStateUsing(function ($record) {
-                    $systemRecord = StockRecord::where('item_id', $record->id)
+                    $systemRecord = StockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
 
-                    $shopRecord = ShopStockRecord::where('item_id', $record->id)
+                    $shopRecord = ShopStockRecord::where('user_id', auth()->id())
+                        ->where('item_id', $record->id)
                         ->orderBy('recorded_at', 'desc')
                         ->first();
 

@@ -11,6 +11,8 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Tables\Columns\TextColumn;
 use App\Filament\Resources\CreditResource\Pages;
+use Filament\Forms\Components\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 
 class CreditResource extends Resource
 {
@@ -19,10 +21,20 @@ class CreditResource extends Resource
     protected static ?string $navigationIcon = 'heroicon-o-arrow-down';
     protected static ?string $navigationGroup = 'Money Management';
 
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->where('user_id', auth()->id())
+            ->where('type', 'credit');
+    }
+
     public static function form(Forms\Form $form): Forms\Form
     {
         return $form
             ->schema([
+                Hidden::make('user_id')
+                    ->default(auth()->id()),
+
                 Forms\Components\Hidden::make('type')
                     ->default('credit'),
 
@@ -79,7 +91,7 @@ class CreditResource extends Resource
     public static function table(Tables\Table $table): Tables\Table
     {
         return $table
-            ->query(Transaction::query()->where('type', 'credit'))
+            ->query(static::getEloquentQuery())
             ->defaultSort('date', 'desc')
             ->columns([
                 TextColumn::make('category.full_path')

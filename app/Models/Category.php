@@ -30,4 +30,8 @@ class Category extends Model
 
         return $path;
     }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 }

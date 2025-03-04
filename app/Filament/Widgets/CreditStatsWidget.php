@@ -11,11 +11,15 @@ class CreditStatsWidget extends BaseWidget
 {
     protected function getStats(): array
     {
-        $todayCredit = Transaction::where('type', 'credit')
+        $userId = auth()->id();
+
+        $todayCredit = Transaction::where('user_id', $userId)
+            ->where('type', 'credit')
             ->whereDate('date', Carbon::today())
             ->sum('amount');
 
-        $todayDebit = Transaction::where('type', 'debit')
+        $todayDebit = Transaction::where('user_id', $userId)
+            ->where('type', 'debit')
             ->whereDate('date', Carbon::today())
             ->sum('amount');
 
@@ -38,10 +42,11 @@ class CreditStatsWidget extends BaseWidget
                 ->color($todayTotal >= 0 ? 'success' : 'danger')
                 ->chart([4, 5, 3, 6, 3, 5, 4]),
 
-            // Existing Monthly and Yearly Stats
+            // Monthly and Yearly Stats
             Stat::make(
                 'Total Credits This Month',
-                Transaction::where('type', 'credit')
+                Transaction::where('user_id', $userId)
+                    ->where('type', 'credit')
                     ->whereMonth('date', Carbon::now()->month)
                     ->whereYear('date', Carbon::now()->year)
                     ->sum('amount')
@@ -52,17 +57,19 @@ class CreditStatsWidget extends BaseWidget
 
             Stat::make(
                 'Total Credits This Year',
-                Transaction::where('type', 'credit')
+                Transaction::where('user_id', $userId)
+                    ->where('type', 'credit')
                     ->whereYear('date', Carbon::now()->year)
                     ->sum('amount')
             )
                 ->description('Total money in this year')
                 ->color('success')
                 ->chart([5, 4, 7, 3, 5, 4, 6]),
-            // Add this after your existing stats in the return array
+
             Stat::make(
                 'Last Month\'s Expenses',
-                Transaction::where('type', 'debit')
+                Transaction::where('user_id', $userId)
+                    ->where('type', 'debit')
                     ->whereMonth('date', Carbon::now()->subMonth()->month)
                     ->whereYear('date', Carbon::now()->subMonth()->year)
                     ->sum('amount')
@@ -70,7 +77,6 @@ class CreditStatsWidget extends BaseWidget
                 ->description('Total expenses last month')
                 ->color('danger')
                 ->chart([4, 6, 3, 5, 4, 7, 5])
-
         ];
     }
 }
